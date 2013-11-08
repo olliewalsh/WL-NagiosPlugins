@@ -716,6 +716,7 @@ my $o_bulksnmp=		undef;	# do snmp bulk request
 my $o_filestore=        "";  # path of the file to store cached data in - overrides $o_base_dir
 my $o_pcount=		2;	# how many sets of previous data should be in performance data
 my $o_nagios_saveddata=	undef;	# enabled SAVEDDATA special output after ||
+my $o_nagios_longoutput=undef;  # use LONGSERVICEOUTPUT to cache data
 
 # These are unrelated WL's contribs to override default description OID 1.3.6.1.2.1.2.2.1.2 and for stp and cisco m[a|y]stery
 my $o_descroid=         undef;  # description oid, overrides $descr_table
@@ -947,6 +948,8 @@ Options for saving results of previous checks to calculate Traffic & Utilization
    file will be saved in this directory, otherwise /tmp is used.
    If parameter is a filename then it is used as a first part in
    how temporary file is named.
+--nagios_longoutput
+   Enables support for outputting cached data to the Nagios LONGSERVICEOUTPUT macro
 --nagios_with_saveddata
    Enables experimental support for future Nagios SAVEDATA (output after ||)
    where cached data for next plugin use goes to special buffer and not PERFDATA
@@ -1135,7 +1138,8 @@ sub check_options {
 	'minimum_queries' => \$o_maxminsnmp, 'bulk_snmp_queries' => \$o_bulksnmp,
 	'F:s'   => \$o_filestore,       'filestore:s' => \$o_filestore,
 	'cisco:s' => \$o_ciscocat,	'stp:s' =>	\$o_stp,
-	'nagios_with_saveddata' => \$o_nagios_saveddata
+	'nagios_with_saveddata' => \$o_nagios_saveddata,
+	'nagios_longoutput' => \$o_nagios_longoutput,
     );
     if (defined ($o_help) ) { help(); exit $ERRORS{"UNKNOWN"}};
     if (defined($o_version)) { p_version(); exit $ERRORS{"UNKNOWN"}};
@@ -1772,7 +1776,7 @@ sub getdata_snmp {
       # load into our new array
       for (my $i=0;$i<scalar(@tindex);$i++) {
 	 $interfaces[$i]={'descr' => $descr[$i]};
-	 $interfaces[$i]{'speed'} = $portspeed[$i] if defined(prev_perf('cache_int_speed'));
+	 $interfaces[$i]{'portspeed'} = $portspeed[$i] if defined(prev_perf('cache_int_speed'));
       }
       if (defined(prev_perf('cache_cisco_opt'))) {
 	 $copt{$_}=$_ foreach(split ',',prev_perf('cache_cisco_opt'));
@@ -2645,12 +2649,12 @@ for (my $i=0;$i < $num_int; $i++) {
 	}
     }
     # output in octet counter
-    if (defined($o_perfo) || (defined($o_prevperf))) {
+    if (defined($o_perfo) || (defined($o_prevperf) && !defined($o_nagios_saveddata) && !defined($o_nagios_longoutput) ) {
 	# we add 'c' for graphing programs to know its a COUNTER
         $perf_out .= " ".perf_name($descr,"in_octet")."=". $interfaces[$i]{'in_bytes'}."c";
         $perf_out .= " ".perf_name($descr,"out_octet")."=". $interfaces[$i]{'out_bytes'}."c";
     }
-    if (defined($o_prevperf) && defined($o_nagios_saveddata)) {
+    if (defined($o_prevperf) && (defined($o_nagios_saveddata) || defined($o_nagios_longoutput))) {
         # we don't need to add 'c' if saved data is separate from perfdata
         $saved_out .= " ".perf_name($descr,"in_octet")."=". $interfaces[$i]{'in_bytes'};
         $saved_out .= " ".perf_name($descr,"out_octet")."=". $interfaces[$i]{'out_bytes'};
@@ -2724,7 +2728,12 @@ else {
 }
 print " | ",$perf_out if defined($perf_out) && $perf_out;
 if (defined($saved_out) && $saved_out) {
-	print " ||" if defined($o_nagios_saveddata);
+	if (defined($o_nagios_longoutput)) {
+	  print "\nDATA:";
+	}
+	elsif (defined($o_nagios_saveddata)) {
+	  print " ||";
+	}
 	print $saved_out;
 }
 print "\n";
