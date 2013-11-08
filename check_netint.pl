@@ -2649,7 +2649,7 @@ for (my $i=0;$i < $num_int; $i++) {
 	}
     }
     # output in octet counter
-    if (defined($o_perfo) || (defined($o_prevperf) && !defined($o_nagios_saveddata) && !defined($o_nagios_longoutput) ) {
+    if (defined($o_perfo) || (defined($o_prevperf) && !defined($o_nagios_saveddata) && !defined($o_nagios_longoutput))) {
 	# we add 'c' for graphing programs to know its a COUNTER
         $perf_out .= " ".perf_name($descr,"in_octet")."=". $interfaces[$i]{'in_bytes'}."c";
         $perf_out .= " ".perf_name($descr,"out_octet")."=". $interfaces[$i]{'out_bytes'}."c";
